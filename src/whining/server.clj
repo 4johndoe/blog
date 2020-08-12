@@ -29,29 +29,129 @@
       :body     "Simple rule: leave content where it is. Do not move it around.
       Here I click on a particular dog image and immediately whole page gets relayouted, every image moves to another random place. It’s like I am looking at the whole new page"}])
 
+(def styles
+  "body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+    font-size: 1em;
+    line-height: 140%;
+    padding: 0.25em 1em;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  
+  img {
+    max-width:100%;
+    height:auto;
+  }
+  
+  hr {
+    border: 0;
+    height: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    margin-bottom: 2em;
+  }
+  
+  header {
+    margin-bottom: 2em;
+  }
+  
+  header h1 {
+    margin-bottom: 0;
+  }
+  
+  header p {
+    /* Without this there's a tiny visual mismatch that bothers me */
+    margin-left: 0.09em; 
+  }
+  
+  .post {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 4em;
+  }
+  
+  .post_sidebar {
+    text-align: center;
+    margin-right: 20px;
+    min-width: 50px;
+    /* display: flex;
+    flex-direction: column;
+    justify-content: space-between; */
+  }
+  
+  .post_sidebar a:visited {
+    color: blue;
+  }
+  
+  img.avatar {
+    border-radius: 100%;
+    width: 50px;
+    height: 50px;
+  }
+  
+  .meta {
+    font-size: 0.75rem;
+  }
+  
+  
+  .author { 
+    font-weight: bold;
+  }
+  
+  footer {
+    padding-top: 1em;
+    margin-top: 1em;
+    border-top: 1px dotted black;
+  } ")
+
 (rum/defc post [post]
   [:.post
     [:.post_sidebar
       [:img.avatar {:src "/i/" (:author post) ".jpg"}]]
     [:div
       [:p [:span.author (:author post)] ": " (:body post)]
-      [:p.meta (:created post) "//" [:a (:href (str "/post/" (:id post)))]]]])
+      [:p.meta (:created post) "//" [:a {:href (str "/post/" (:id post))} "Ссылка"]]]])
+
+(rum/defc page [title & children]
+  [:html
+    [:head 
+      [:meta { :http-equiv "Content-Type" :content "text/html; charset=UTF-8"}]
+      [:title title]
+      [:meta { :name "viewport" :content "width-device-width, initial-scale=1.0"}]
+      [:style {:dangerouslySetInnerHTML { :__html styles }}]]
+    [:body
+      [:header
+        [:h1 "Ворчанне ягнят:"]
+        [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
+      children ]])
 
 (rum/defc index [posts]
-  [:html
-    [:body
+  (page "Ворчание ягнят:"
       (for [p posts]
-        (post p))]])
+        (post p))))
+
+(defn render-html [component]
+  (str "<!DOCTYPE html>\n" (rum/render-static-markup component)))
 
 (cj/defroutes routes
   (cj/GET "/" [:as req]
-    { :body (rum/render-static-markup (index posts)) })
+    { :body (render-html (index posts)) })
   (cj/GET "/write" [:as req]
     { :body "WRITE" })
   (cj/POST "/write" [:as req]
     { :body "POST" }))
 
-(def app routes)
+(defn with-headers [handler headers]
+  (fn [request]
+    (some-> (handler request)
+     (update :headers merge headers))))
+
+(def app 
+  (-> routes
+    (with-headers { "Cache-Control" "no-cache"
+                    "Expires"       "-1" 
+                    "Content-Type" "text/html; charset=UTF-8"})))
 
 (defn -main [& args]
   (let [args-map (apply array-map args)
