@@ -9,5 +9,6 @@
     [ring/ring-core             "1.8.1"]
     [org.immutant/web           "2.1.10"]
     [rum                        "0.12.3"]
-    [org.clojure/clojurescript  "1.10.773"]]
+    [org.clojure/clojurescript  "1.10.773"]
+    [clojure.joda-time "0.7.0"]]
   :repl-options {:init-ns whining.server})
