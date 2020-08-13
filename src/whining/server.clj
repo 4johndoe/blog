@@ -1,6 +1,7 @@
 (ns whining.server
   (:require
     [rum.core :as rum]
+    [ring.util.response]
     [clojure.edn :as edn]
     [immutant.web :as web]
     [compojure.core :as cj]
@@ -94,10 +95,16 @@
 
 (cj/defroutes routes
   (cjr/resources "/i" {:root "public/i"})
+
   (cj/GET "/" [:as req]
     { :body (render-html (index post_ids)) })
+
+  (cj/GET "/post/:id/:img" [id img]
+    (ring.util.response/file-response (str "posts/" id "/" img)))
+
   (cj/GET "/write" [:as req]
     { :body "WRITE" })
+
   (cj/POST "/write" [:as req]
     { :body "POST" }))
 
