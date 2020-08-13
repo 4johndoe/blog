@@ -1,23 +1,16 @@
 (ns whining.server
   (:require
+    [compojure.route]
     [rum.core :as rum]
     [ring.util.response]
     [clojure.edn :as edn]
     [immutant.web :as web]
-    [compojure.core :as cj]
     [clojure.java.io :as io]
-    [compojure.route :as cjr])
+    [compojure.core :as compojure])
   (:import
     [org.joda.time DateTime]
     [org.joda.time.format DateTimeFormat]))
 
-; "/"
-; "/feed"
-; "/post/:id"
-; "/post/:id/pict.jpg"
-; "/login"
-; GET "/write"
-; POST "/write"
 
 (def app 
   (fn [req]
@@ -87,20 +80,30 @@
   (str "<!DOCTYPE html>\n" (rum/render-static-markup component)))
 
 
-(cj/defroutes routes
-  (cjr/resources "/i" {:root "public/i"})
+; "/"
+; "/feed"
+; "/post/:id"
+; "/post/:id/pict.jpg"
+; "/login"
+; GET "/write"
+; POST "/write"
 
-  (cj/GET "/" [:as req]
+
+(compojure/defroutes routes
+  (compojure.route/resources "/i" {:root "public/i"})
+
+  (compojure/GET "/" []
     { :body (render-html (index (post-ids))) })
 
-  (cj/GET "/post/:id/:img" [id img]
+  (compojure/GET "/post/:id/:img" [id img]
     (ring.util.response/file-response (str "posts/" id "/" img)))
 
-  (cj/GET "/write" [:as req]
-    { :body "WRITE" })
+  ; (compojure/GET "/write" []
+  ;   { :body "WRITE" })
 
-  (cj/POST "/write" [:as req]
-    { :body "POST" }))
+  ; (compojure/POST "/write" [:as req]
+  ;   { :body "POST" })
+    )
 
 
 (defn with-headers [handler headers]
@@ -121,6 +124,7 @@
         port-str (or  (get args-map "-p")
                       (get args-map "--port")
                       "7070")]
+  (println "Starting webserver on port " port-str)
   (web/run #'app { :port (Integer/parseInt port-str) })))
 
 
