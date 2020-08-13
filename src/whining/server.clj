@@ -40,34 +40,47 @@
       [:p.meta (render-date (:created post)) " // " [:a {:href (str "/post/" (:id post))} "Ссылка"]]]])
 
 
-(rum/defc page [title & children]
-  [:html
-    [:head 
-      [:meta { :http-equiv "Content-Type" :content "text/html; charset=UTF-8"}]
-      [:title title]
-      [:meta { :name "viewport" :content "width-device-width, initial-scale=1.0"}]
-      [:style {:dangerouslySetInnerHTML { :__html styles }}]]
-    [:body
-      [:header
-        [:h1 "Ворчанне ягнят:"]
-        [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
-      children ]
-    [:footer
-      [:a { :href "https://twitter.com/nikitonsky" } "Nikita Prokopov"]
-      [:a { :href "https://twitter.com/freetonik" } "Rakhim Davletkaliev"]
-      [:br]
-      [:a { :href "/feed" :rel "alternate" :type "application/rss+xml"} "RSS"]]
-    [:script {:dangerouslySetInnerHTML {:__html script}}]])
+(rum/defc page [opts & children]
+ (let [{:keys [title index?]
+        :or {title    "Ворчание ягнят"
+              index?  false}} opts]
+    [:html
+      [:head 
+        [:meta { :http-equiv "Content-Type" :content "text/html; charset=UTF-8"}]
+        [:title title]
+        [:meta { :name "viewport" :content "width-device-width, initial-scale=1.0"}]
+        [:style {:dangerouslySetInnerHTML { :__html styles }}]]
+      [:body
+        [:header
+          (if index?
+            [:h1 title]
+            [:h1 [:a {:href "/"} title]])
+          [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
+        children ]
+      [:footer
+        [:a { :href "https://twitter.com/nikitonsky" } "Nikita Prokopov"]
+        [:a { :href "https://twitter.com/freetonik" } "Rakhim Davletkaliev"]
+        [:br]
+        [:a { :href "/feed" :rel "alternate" :type "application/rss+xml"} "RSS"]]
+      [:script {:dangerouslySetInnerHTML {:__html script}}]]))
 
 
-(rum/defc index [post_ids]
-  (page "Ворчание ягнят:"
-      (for [post_id post_ids
-            :let [path  (str "posts/" post_id "/post.edn")
-                  p     (-> (io/file path)
-                            (slurp)
-                            (edn/read-string))]]
-        (post p))))
+(defn get-post [post_id]
+  (let [path (str "posts/" post_id "/post.edn")]
+    (-> (io/file path)
+        (slurp)
+        (edn/read-string))))
+
+
+(rum/defc index-page [post_ids]
+  (page {:index? true}
+      (for [post_id post_ids]
+        (post (get-post post_id)))))
+
+
+(rum/defc post-page [post_id]
+  (page {}
+      (post (get-post post_id))))
 
 
 (defn post-ids [] 
@@ -89,22 +102,28 @@
 ; GET "/write"
 ; POST "/write"
 
-
+(render-html (post-page 123))
 (compojure/defroutes routes
   (compojure.route/resources "/i" {:root "public/i"})
 
   (compojure/GET "/" []
-    { :body (render-html (index (post-ids))) })
+    { :body (render-html (index-page (post-ids))) })
 
   (compojure/GET "/post/:id/:img" [id img]
     (ring.util.response/file-response (str "posts/" id "/" img)))
+
+  (compojure/GET "/post/:id" [id]
+    { :body (render-html (post-page id)) })
 
   ; (compojure/GET "/write" []
   ;   { :body "WRITE" })
 
   ; (compojure/POST "/write" [:as req]
   ;   { :body "POST" })
-    )
+  
+  (fn [req]
+    { :status 404
+      :body "Not found" }))
 
 
 (defn with-headers [handler headers]
