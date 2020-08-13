@@ -1,0 +1,6 @@
+{   :id       "456" 
+      :created  #inst "2020-01-03"
+      :author   "freetonik"
+      :body     "Simple rule: leave content where it is. Do not move it around.
+      Here I click on a particular dog image and immediately whole page gets relayouted, every image moves to another random place. It’s like I am looking at the whole new page"
+      :pictures ["youtube.jpg"] }

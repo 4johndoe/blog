@@ -1,8 +1,10 @@
 (ns whining.server
   (:require
     [rum.core :as rum]
+    [clojure.edn :as edn]
     [immutant.web :as web]
     [compojure.core :as cj]
+    [clojure.java.io :as io]
     [compojure.route :as cjr])
   (:import
     [org.joda.time DateTime]
@@ -21,96 +23,10 @@
     { :status 200
       :body (:uri req) }))
 
-(def posts
-  [{  :id       "123" 
-      :created  #inst "2020-01-01"
-      :author   "nikitonsky"
-      :body     "One of the most useless and most annoying UIs in iPhone. This window pop ups on a random phone in the room if you open the case (no, not only on the phones it has been paired to—literally on any phone in proximity).
-      But then it doesn’t reliably pop up when you actually need it (of course!). Sometimes I spend a few literal minutes opening and closing the case like a fool, putting airpods in or out, turning the phone on or off, in the hope it will finally show. This is stupid, because Airpods are connected via bluetooth to the phone already! I can listen for the audio, but can’t see the battery level, because, well, nobody knows why and there’s no button to press to force it to show.
-      Finally, look at the size of this thing! It covers the good half of the screen, and it’s the most important half (the bottom) where you are most likely to be doing something. Somehow after 13 years Apple was convinced that volume indicator shouldn’t cover the center of the screen. Next year we will see an incoming call notification that is, well, a tiny notification instead of a whole screen. Maybe eventually they’ll figure that out for airpods too? It only needs to show two numbers, come on!"
-      :pictures ["shop.jpg"]}
-  {   :id       "456" 
-      :created  #inst "2020-01-03"
-      :author   "freetonik"
-      :body     "Simple rule: leave content where it is. Do not move it around.
-      Here I click on a particular dog image and immediately whole page gets relayouted, every image moves to another random place. It’s like I am looking at the whole new page"
-      :pictures ["youtube.jpg"] }])
+(def post_ids ["123" "456"])
 
 (def styles
-  "body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
-    font-size: 1em;
-    line-height: 140%;
-    padding: 0.25em 1em;
-    max-width: 640px;
-    margin: 0 auto;
-  }
-  
-  img {
-    max-width:100%;
-    height:auto;
-  }
-  
-  hr {
-    border: 0;
-    height: 0;
-    border-top: 1px solid rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-    margin-bottom: 2em;
-  }
-  
-  header {
-    margin-bottom: 2em;
-  }
-  
-  header h1 {
-    margin-bottom: 0;
-  }
-  
-  header p {
-    /* Without this there's a tiny visual mismatch that bothers me */
-    margin-left: 0.09em; 
-  }
-  
-  .post {
-    display: flex;
-    justify-content: flex-start;
-    margin-bottom: 4em;
-  }
-  
-  .post_sidebar {
-    text-align: center;
-    margin-right: 20px;
-    min-width: 50px;
-    /* display: flex;
-    flex-direction: column;
-    justify-content: space-between; */
-  }
-  
-  .post_sidebar a:visited {
-    color: blue;
-  }
-  
-  img.avatar {
-    border-radius: 100%;
-    width: 50px;
-    height: 50px;
-  }
-  
-  .meta {
-    font-size: 0.75rem;
-  }
-  
-  
-  .author { 
-    font-weight: bold;
-  }
-  
-  footer {
-    padding-top: 1em;
-    margin-top: 1em;
-    border-top: 1px dotted black;
-  } ")
+  (slurp (io/resource "style.css")))
 
 (def date-formatter (DateTimeFormat/forPattern "dd.MM.YYYY"))
 
@@ -164,9 +80,13 @@
     div.innerHTML = subtitle;
     }"}}]])
 
-(rum/defc index [posts]
+(rum/defc index [post_ids]
   (page "Ворчание ягнят:"
-      (for [p posts]
+      (for [post_id post_ids
+            :let [path  (str "posts/" post_id "/post.edn")
+                  p     (-> (io/file path)
+                            (slurp)
+                            (edn/read-string))]]
         (post p))))
 
 (defn render-html [component]
@@ -175,7 +95,7 @@
 (cj/defroutes routes
   (cjr/resources "/i" {:root "public/i"})
   (cj/GET "/" [:as req]
-    { :body (render-html (index posts)) })
+    { :body (render-html (index post_ids)) })
   (cj/GET "/write" [:as req]
     { :body "WRITE" })
   (cj/POST "/write" [:as req]
