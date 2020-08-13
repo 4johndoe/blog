@@ -8,4 +8,10 @@
     [org.clojure/clojurescript  "1.10.773"]
     [clojure.joda-time "0.7.0"]]
   :repl-options {:init-ns whining.server}
-  :main whining.server)
+  :main whining.server
+  :profiles {
+    :userjar {
+      :aot [whining.server]
+      :uberjar-name "whining.jar"
+    }
+  })
