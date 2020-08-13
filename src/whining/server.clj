@@ -24,15 +24,16 @@
     { :status 200
       :body (:uri req) }))
 
-(def post_ids ["123" "456"])
+(def styles (slurp (io/resource "style.css")))
+(def script (slurp (io/resource "script.js")))
 
-(def styles
-  (slurp (io/resource "style.css")))
 
 (def date-formatter (DateTimeFormat/forPattern "dd.MM.YYYY"))
 
+
 (defn render-date [inst]
   (.print date-formatter (DateTime. inst)))
+
 
 (rum/defc post [post]
   [:.post
@@ -43,6 +44,7 @@
         [:img { :src (str "/post/" (:id post) "/" name)}])
       [:p [:span.author (:author post)] ": " (:body post)]
       [:p.meta (render-date (:created post)) " // " [:a {:href (str "/post/" (:id post))} "Ссылка"]]]])
+
 
 (rum/defc page [title & children]
   [:html
@@ -61,25 +63,8 @@
       [:a { :href "https://twitter.com/freetonik" } "Rakhim Davletkaliev"]
       [:br]
       [:a { :href "/feed" :rel "alternate" :type "application/rss+xml"} "RSS"]]
-    [:script {:dangerouslySetInnerHTML {:__html
-    "window.onload = function() {
-      reloadSubtitle();
-      document.getElementById('site_subtitle').onclick = reloadSubtitle;
-    }
-    
-    function reloadSubtitle() {
-      var subtitles = [
-        'Вы уверены, что хотите отменить? - Да / Нет / Отмена',
-        'Select purchase to purchase for $0.00 - PURCHASE / CANCEL',
-        'Это не текст, это ссылка. Не нажимайте на ссылку.',
-        'Не обновляйте эту страницу! Не нажимайте НАЗАД',
-        'Произошла ошибка ОК',
-        'Пароль должен содержать заглавную букву и специальный символ'
-      ];
-    var subtitle = subtitles[Math.floor(Math.random() * subtitles.length)];
-    var div = document.getElementById('site_subtitle');
-    div.innerHTML = subtitle;
-    }"}}]])
+    [:script {:dangerouslySetInnerHTML {:__html script}}]])
+
 
 (rum/defc index [post_ids]
   (page "Ворчание ягнят:"
@@ -90,14 +75,23 @@
                             (edn/read-string))]]
         (post p))))
 
+
+(defn post-ids [] 
+  (for [name (seq (.list (io/file "posts")))
+        :let [child (io/file "posts" name)]
+        :when (.isDirectory child)]
+      name))
+
+
 (defn render-html [component]
   (str "<!DOCTYPE html>\n" (rum/render-static-markup component)))
+
 
 (cj/defroutes routes
   (cjr/resources "/i" {:root "public/i"})
 
   (cj/GET "/" [:as req]
-    { :body (render-html (index post_ids)) })
+    { :body (render-html (index (post-ids))) })
 
   (cj/GET "/post/:id/:img" [id img]
     (ring.util.response/file-response (str "posts/" id "/" img)))
@@ -108,10 +102,12 @@
   (cj/POST "/write" [:as req]
     { :body "POST" }))
 
+
 (defn with-headers [handler headers]
   (fn [request]
     (some-> (handler request)
      (update :headers merge headers))))
+
 
 (def app 
   (-> routes
@@ -119,12 +115,14 @@
                     "Expires"       "-1" 
                     "Content-Type" "text/html; charset=UTF-8"})))
 
+
 (defn -main [& args]
   (let [args-map (apply array-map args)
         port-str (or  (get args-map "-p")
                       (get args-map "--port")
                       "7070")]
   (web/run #'app { :port (Integer/parseInt port-str) })))
+
 
 (comment 
   (def server (-main "--port" "7070"))
