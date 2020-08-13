@@ -174,7 +174,6 @@
 
 (cj/defroutes routes
   (cjr/resources "/i" {:root "public/i"})
-  (cjr/resources "/i" {:root "public/i"})
   (cj/GET "/" [:as req]
     { :body (render-html (index posts)) })
   (cj/GET "/write" [:as req]
