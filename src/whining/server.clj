@@ -119,8 +119,8 @@
             :name "body"
             :placeholder "Пиши сюда ..."}]
         [:input.edit_post_submit 
-          { :type "submit" }
-          (if create? "Создать" "Сохранить")]])))
+          { :type "submit"
+            :value (if create? "Создать" "Сохранить") }]])))
 
 
 (defn post-ids [] 
