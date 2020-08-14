@@ -6,8 +6,10 @@
     [clojure.edn :as edn]
     [immutant.web :as web]
     [clojure.java.io :as io]
+    [ring.middleware.params]
     [compojure.core :as compojure])
   (:import
+    [java.util UUID]
     [org.joda.time DateTime]
     [org.joda.time.format DateTimeFormat])
   (:gen-class))
@@ -65,11 +67,34 @@
       [:script {:dangerouslySetInnerHTML {:__html script}}]]))
 
 
+(defn safe-slurp [source]
+  (try
+    (slurp source)
+    (catch Exception e
+      nil)))
+
+
 (defn get-post [post_id]
   (let [path (str "posts/" post_id "/post.edn")]
-    (-> (io/file path)
-        (slurp)
+    (some-> (io/file path)
+        (safe-slurp)
         (edn/read-string))))
+
+
+(defn next-post-id []
+  (let [uuid      (UUID/randomUUID)
+        time      (int (/ (System/currentTimeMillis) 1000))
+        high      (.getMostSignificantBits uuid)
+        low       (.getLeastSignificantBits uuid)
+        new-high  (bit-or (bit-and high 0x00000000FFFFFFFF)
+                          (bit-shift-left time 32)) ]
+    (str (UUID. new-high low))))
+
+
+(defn save-post! [post]
+  (let [dir (io/file (str "posts/" (:id post)))]
+    (.mkdir dir)
+    (spit (io/file dir "post.edn") (pr-str post))))
 
 
 (rum/defc index-page [post_ids]
@@ -81,6 +106,21 @@
 (rum/defc post-page [post_id]
   (page {}
       (post (get-post post_id))))
+
+
+(rum/defc edit-post-page [post_id]
+  (let [post (get-post post_id)
+        create? (nil? post)]
+    (page {:title (if create? "Создание" "Редактирование")}
+      [:form {  :action (str "/post/" post_id "/edit")
+                :method "post" }
+        [:textarea.edit_post_body 
+          { :value (:body post "") 
+            :name "body"
+            :placeholder "Пиши сюда ..."}]
+        [:input.edit_post_submit 
+          { :type "submit" }
+          (if create? "Создать" "Сохранить")]])))
 
 
 (defn post-ids [] 
@@ -102,12 +142,16 @@
 ; GET "/write"
 ; POST "/write"
 
-(render-html (post-page 123))
+
 (compojure/defroutes routes
   (compojure.route/resources "/i" {:root "public/i"})
 
   (compojure/GET "/" []
     { :body (render-html (index-page (post-ids))) })
+
+  (compojure/GET "/post/new" []
+    { :status 303
+      :headers { "Location" (str "/post/" (next-post-id) "/edit") }})  
 
   (compojure/GET "/post/:id/:img" [id img]
     (ring.util.response/file-response (str "posts/" id "/" img)))
@@ -115,11 +159,17 @@
   (compojure/GET "/post/:id" [id]
     { :body (render-html (post-page id)) })
 
-  ; (compojure/GET "/write" []
-  ;   { :body "WRITE" })
+  (compojure/GET "/post/:id/edit" [id]
+    { :body (render-html (edit-post-page id)) })
 
-  ; (compojure/POST "/write" [:as req]
-  ;   { :body "POST" })
+  (compojure/POST "/post/:id/edit" [id :as req]
+    (let [params (:form-params req)
+          body   (get params "body")]
+        (save-post! { :id id
+                      :body body
+                      :author "nikitonsky" }) ;; FIXME author
+        { :status 303
+        :headers { "Location" (str "/post/" id) }}))
   
   (fn [req]
     { :status 404
@@ -134,6 +184,7 @@
 
 (def app 
   (-> routes
+    (ring.middleware.params/wrap-params)
     (with-headers { "Cache-Control" "no-cache"
                     "Expires"       "-1" 
                     "Content-Type" "text/html; charset=UTF-8"})))
