@@ -7,7 +7,8 @@
     [immutant.web :as web]
     [clojure.java.io :as io]
     [ring.middleware.params]
-    [compojure.core :as compojure])
+    [compojure.core :as compojure]
+    [ring.middleware.multipart-params])
   (:import
     [java.util UUID]
     [org.joda.time DateTime]
@@ -92,10 +93,17 @@
     (str (UUID. new-high low))))
 
 
-(defn save-post! [post]
-  (let [dir (io/file (str "posts/" (:id post)))]
+(defn save-post! [post pictures]
+  (let [dir           (io/file (str "posts/" (:id post)))
+        picture-names (for [[picture idx] (map vector pictures (range))
+                            :let [in-name   (:filename picture)
+                                  [_ ext]   (re-matches #".*(\.[^\.]+)" in-name)]]
+                        (str (:id post) "_" (inc idx) ext))]
     (.mkdir dir)
-    (spit (io/file dir "post.edn") (pr-str post))))
+    (doseq [[picture name] (map vector pictures picture-names)]
+      (io/copy (:tempfile picture) (io/file dir name))
+      (.delete (:tempfile picture)))
+    (spit (io/file dir "post.edn") (pr-str (assoc post :pictures (vec picture-names))))))
 
 
 (rum/defc index-page [post_ids]
@@ -114,7 +122,8 @@
         create? (nil? post)]
     (page {:title (if create? "Создание" "Редактирование")}
       [:form {  :action (str "/post/" post_id "/edit")
-                :method "post" }
+                :method "post"
+                :enctype "multipart/form-data" }
         [:.edit_post_body
           [:textarea 
             { :value (:body post "") 
@@ -167,14 +176,17 @@
   (compojure/GET "/post/:id/edit" [id]
     { :body (render-html (edit-post-page id)) })
 
-  (compojure/POST "/post/:id/edit" [id :as req]
-    (let [params (:form-params req)
-          body   (get params "body")]
-        (save-post! { :id id
-                      :body body
-                      :author "nikitonsky" }) ;; FIXME author
-        { :status 303
-        :headers { "Location" (str "/post/" id) }}))
+(ring.middleware.multipart-params/wrap-multipart-params
+    (compojure/POST "/post/:id/edit" [id :as req]
+      (let [params  (:multipart-params req)
+            body    (get params "body")
+            picture (get params "picture")]
+          (save-post! { :id id
+                        :body body
+                        :author "nikitonsky" } ;; FIXME author
+                      [picture])
+          { :status 303
+          :headers { "Location" (str "/post/" id) }})))
   
   (fn [req]
     { :status 404
@@ -187,12 +199,25 @@
      (update :headers merge headers))))
 
 
+(defn print-errors [handler]
+  (fn [req]
+    (try 
+      (handler req)
+      (catch Exception e
+        (.printStackTrace e)
+        { :status 500
+          :headers { "Content-Type" "text/html; charset=UTF-8" }
+          :body (with-out-str
+                  (clojure.stacktrace/print-stack-trace (clojure.stacktrace/root-cause e))) }))))
+
+
 (def app 
   (-> routes
     (ring.middleware.params/wrap-params)
     (with-headers { "Cache-Control" "no-cache"
                     "Expires"       "-1" 
-                    "Content-Type" "text/html; charset=UTF-8"})))
+                    "Content-Type" "text/html; charset=UTF-8"})
+  (print-errors)))
 
 
 (defn -main [& args]
@@ -207,3 +232,4 @@
 (comment 
   (def server (-main "--port" "7070"))
   (web/stop server))
+; 2 1:35
