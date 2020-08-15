@@ -57,6 +57,7 @@
           (if index?
             [:h1 title]
             [:h1 [:a {:href "/"} title]])
+            [:a { :href "/post/new" } " New Post"]
           [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
         children ]
       [:footer
@@ -114,13 +115,17 @@
     (page {:title (if create? "Создание" "Редактирование")}
       [:form {  :action (str "/post/" post_id "/edit")
                 :method "post" }
-        [:textarea.edit_post_body 
-          { :value (:body post "") 
-            :name "body"
-            :placeholder "Пиши сюда ..."}]
-        [:input.edit_post_submit 
-          { :type "submit"
-            :value (if create? "Создать" "Сохранить") }]])))
+        [:.edit_post_body
+          [:textarea 
+            { :value (:body post "") 
+              :name "body"
+              :placeholder "Пиши сюда ..."}]]
+        [:.edit_post_picture
+          [:input { :type "file" :name "picture" }]]
+        [:.edit_post_submit
+          [:input 
+            { :type "submit"
+              :value (if create? "Создать" "Сохранить") }]]])))
 
 
 (defn post-ids [] 
