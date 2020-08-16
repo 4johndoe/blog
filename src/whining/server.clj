@@ -49,7 +49,8 @@
         [:p (when (== 0 idx)
               [:span.author (:author post) ": "])
             p])
-      [:p.meta (render-date (:created post)) " // " [:a {:href (str "/post/" (:id post))} "Ссылка"]]]])
+      [:p.meta (render-date (:created post)) " // " [:a {:href (str "/post/" (:id post) )} "Ссылка"]
+                                             " // " [:a {:href (str "/post/" (:id post) "/edit")} "edit"]]]])
 
 
 (rum/defc page [opts & children]
@@ -92,14 +93,32 @@
         (edn/read-string))))
 
 
+(def ^:const encode-table "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefjhijklmnopqrstuvwxyz")
+
+
+(defn encode [num len]
+  (loop [ num num
+          list ()
+          len len ]
+    (if (== 0 len)
+      (str/join list)
+      (recur  (bit-shift-right num 6) 
+              (let [ch (nth encode-table (bit-and num 0x3F))]
+                (conj list ch))
+              (dec len)))))
+
+
 (defn next-post-id []
-  (let [uuid      (UUID/randomUUID)
-        time      (int (/ (System/currentTimeMillis) 1000))
-        high      (.getMostSignificantBits uuid)
-        low       (.getLeastSignificantBits uuid)
-        new-high  (bit-or (bit-and high 0x00000000FFFFFFFF)
-                          (bit-shift-left time 32)) ]
-    (str (UUID. new-high low))))
+  (str
+    (encode (quot (System/currentTimeMillis) 1000) 6)
+    (encode (rand-int (* 64 64 64)) 3)))
+  ; (let [uuid      (UUID/randomUUID)
+  ;       time      (int (/ (System/currentTimeMillis) 1000))
+  ;       high      (.getMostSignificantBits uuid)
+  ;       low       (.getLeastSignificantBits uuid)
+  ;       new-high  (bit-or (bit-and high 0x00000000FFFFFFFF)
+  ;                         (bit-shift-left time 32)) ]
+  ;   (str (UUID. new-high low))))
 
 
 (defn save-post! [post pictures]
