@@ -105,7 +105,7 @@
           (if index?
             [:h1 title]
             [:h1 [:a {:href "/"} title]])
-            [:a { :href "/post/new" } " New Post"]
+            [:a { :href "/write" } " New Post"]
           [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
         children ]
       [:footer
@@ -240,7 +240,7 @@
 
 (defn check-session [req]
   (when (nil? (:user req))
-      { :status 302
+    { :status 302
       :headers {  "Location" (str "/forbidden?redirect=" (encode-uri-component (:uri req)))  }} ))
 
 
@@ -248,31 +248,44 @@
   (compojure/GET "/write" [:as req]
     (or
       (check-session req)
-    { :status 303
+      { :status 303
         :headers { "Location" (str "/post/" (next-post-id) "/edit") }}))
-
+  
   (compojure/GET "/post/:id/edit" [id :as req]
     (or
       (check-session req)
       { :body (render-html (edit-post-page id)) }))
-
-(ring.middleware.multipart-params/wrap-multipart-params
-    (compojure/POST "/post/:id/edit" [id :as req]
+  
+  (ring.middleware.multipart-params/wrap-multipart-params
+      (compojure/POST "/post/:id/edit" [id :as req]
         (or 
           (check-session req)
-      (let [params  (:multipart-params req)
-            body    (get params "body")
-            picture (get params "picture")]
-          (save-post! { :id id
-                        :body body
+          (let [params  (:multipart-params req)
+                body    (get params "body")
+                picture (get params "picture")]
+              (save-post! { :id id
+                            :body body
                             :author (:user req)
                             :created (java.util.Date.) }
-                      [picture])
-          { :status 303
+                          [picture])
+              { :status 303
               :headers { "Location" (str "/post/" id) }})))))
 
 
-  (compojure/GET "/forbidden" [req]
+(compojure/defroutes routes
+  (compojure.route/resources "/i" {:root "public/i"})
+
+  (compojure/GET "/" []
+    { :body (render-html (index-page (post-ids))) })
+
+  (compojure/GET "/post/:id/:img" [id img]
+    (ring.util.response/file-response (str "posts/" id "/" img)))
+
+  (compojure/GET "/post/:id" [id]
+    { :body (render-html (post-page id)) })
+
+
+  (compojure/GET "/forbidden" [:as req]
     { :body (render-html (forbidden-page (get (:params req) "redirect"))) })
 
   
@@ -288,7 +301,8 @@
                                 ; :max-age    ;; FIXME 
                               }}}))
 
-  
+  protected-routes
+
   (fn [req]
     { :status 404
       :body "Not found" }))
@@ -333,5 +347,5 @@
 
 (comment 
   (def server (-main "--port" "7070"))
-  (web/stop server))
-; 2 1:59
+  (web/stop server)
+)
