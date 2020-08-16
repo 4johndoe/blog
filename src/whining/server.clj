@@ -200,6 +200,12 @@
           [:button (if create? "Создать" "Сохранить")]]])))
 
 
+(rum/defc forbidden-page [redirect]
+  (page {}
+    [:a { :href (str "/authenticate?user=nikitonsky&token=ABC&redirect=" (encode-uri-component redirect)) }
+        "Login"]))
+
+
 (defn post-ids [] 
   (->>
     (for [name (seq (.list (io/file "posts")))
@@ -252,7 +258,25 @@
                         :author "nikitonsky" } ;; FIXME author
                       [picture])
           { :status 303
-          :headers { "Location" (str "/post/" id) }})))
+            :headers { "Location" (str "/post/" id) }}))))
+
+
+  (compojure/GET "/forbidden" [req]
+    { :body (render-html (forbidden-page (get (:params req) "redirect"))) })
+
+  
+  (compojure/GET "/authenticate" [req] ;; ?user=...&token=..&redirect=...
+    (let [user  (get (:params req) "user")
+          token (get (:params req) "token")
+          redirect (get (:params req) "redirect")]
+      { :status 302
+        :headers { "Location" redirect }
+        :cookies { "session" {  :value (pr-str { :user user })
+                                :http-only true
+                                :secure false ;; FIXME
+                                ; :max-age    ;; FIXME 
+                              }}}))
+
   
   (fn [req]
     { :status 404
