@@ -244,36 +244,32 @@
       :headers {  "Location" (str "/forbidden?redirect=" (encode-uri-component (:uri req)))  }} ))
 
 
-(compojure/defroutes routes
-  (compojure.route/resources "/i" {:root "public/i"})
-
-  (compojure/GET "/" []
-    { :body (render-html (index-page (post-ids))) })
-
-  (compojure/GET "/post/new" []
+(compojure/defroutes protected-routes
+  (compojure/GET "/write" [:as req]
+    (or
+      (check-session req)
     { :status 303
-      :headers { "Location" (str "/post/" (next-post-id) "/edit") }})  
+        :headers { "Location" (str "/post/" (next-post-id) "/edit") }}))
 
-  (compojure/GET "/post/:id/:img" [id img]
-    (ring.util.response/file-response (str "posts/" id "/" img)))
-
-  (compojure/GET "/post/:id" [id]
-    { :body (render-html (post-page id)) })
-
-  (compojure/GET "/post/:id/edit" [id]
-    { :body (render-html (edit-post-page id)) })
+  (compojure/GET "/post/:id/edit" [id :as req]
+    (or
+      (check-session req)
+      { :body (render-html (edit-post-page id)) }))
 
 (ring.middleware.multipart-params/wrap-multipart-params
     (compojure/POST "/post/:id/edit" [id :as req]
+        (or 
+          (check-session req)
       (let [params  (:multipart-params req)
             body    (get params "body")
             picture (get params "picture")]
           (save-post! { :id id
                         :body body
-                        :author "nikitonsky" } ;; FIXME author
+                            :author (:user req)
+                            :created (java.util.Date.) }
                       [picture])
           { :status 303
-            :headers { "Location" (str "/post/" id) }}))))
+              :headers { "Location" (str "/post/" id) }})))))
 
 
   (compojure/GET "/forbidden" [req]
