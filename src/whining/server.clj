@@ -9,6 +9,7 @@
     [clojure.java.io :as io]
     [ring.middleware.params]
     [compojure.core :as compojure]
+    [clojure.java.shell :as shell]
     [ring.middleware.multipart-params])
   (:import
     [java.util UUID]
@@ -35,6 +36,31 @@
 
 (defn render-date [inst]
   (.print date-formatter (DateTime. inst)))
+
+
+(defn send-mail! [{:keys [to subject body]}]
+  (shell/sh
+    "mail"
+    "-s"
+    subject
+    to
+    "-a" "Content-Type: text/html"
+    "-a" "From:Grumpy Admin <admin@grumpy.website>"
+    :in body))
+
+(send-mail! { :to "bogdandemchenko@gmail.com"
+              :subject (str "Login to Grumpy " (rand))
+              :body "<html>
+                      <div style='text-align: center;'>
+                        <a href='#' 
+                           style='display: inline-block; 
+                                  font-size: 16px; 
+                                  padding: 0.5em 1.75em; 
+                                  background: #c3c; 
+                                  color: white; 
+                                  text-decoration: none; 
+                                  border-radius: 4px;'>
+                          Login:</a></div></html>" })
 
 
 (rum/defc post [post]
