@@ -229,13 +229,19 @@
 ; POST "/write"
 
 
-(defn check-session [handler]
+(defn read-session [handler]
   (fn [req]
-    (if-some [session (some-> (get-in req [:cookies "session" :value])
+    (prn (str req))
+    (let [session (some-> (get-in req [:cookies "session" :value])
                               (edn/read-string))]
-      (handler (assoc req :user (:user session)))
+      (handler (if (some? session)
+                    (assoc req :user (:user session))
+                    req)))))
+
+(defn check-session [req]
+  (when (nil? (:user req))
       { :status 302
-        :headers {  "Location" (str "/forbidden?redirect=" (encode-uri-component (:uri req)))  }} )))
+      :headers {  "Location" (str "/forbidden?redirect=" (encode-uri-component (:uri req)))  }} ))
 
 
 (compojure/defroutes routes
@@ -312,6 +318,7 @@
 
 (def app 
   (-> routes
+    (read-session)
     (ring.middleware.params/wrap-params)
     (with-headers { "Cache-Control" "no-cache"
                     "Expires"       "-1" 
