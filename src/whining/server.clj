@@ -229,6 +229,15 @@
 ; POST "/write"
 
 
+(defn check-session [handler]
+  (fn [req]
+    (if-some [session (some-> (get-in req [:cookies "session" :value])
+                              (edn/read-string))]
+      (handler (assoc req :user (:user session)))
+      { :status 302
+        :headers {  "Location" (str "/forbidden?redirect=" (encode-uri-component (:uri req)))  }} )))
+
+
 (compojure/defroutes routes
   (compojure.route/resources "/i" {:root "public/i"})
 
