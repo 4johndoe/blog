@@ -104,9 +104,10 @@
       [:body
         [:header
           (if index?
-            [:h1 title]
+            [:h1 title 
+              [:a#add_post { :href "/write" }
+                [:img#add_post { :src "/i/addNewPost.png" }] ]]
             [:h1 [:a {:href "/"} title]])
-            [:a { :href "/write" } " New Post"]
           [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
         children ]
       [:footer
@@ -232,12 +233,12 @@
 
 (defn read-session [handler]
   (fn [req]
-    (prn (str req))
     (let [session (some-> (get-in req [:cookies "session" :value])
                               (edn/read-string))]
       (handler (if (some? session)
                     (assoc req :user (:user session))
                     req)))))
+
 
 (defn check-session [req]
   (when (nil? (:user req))

@@ -8,9 +8,15 @@ body {
 }
 
 img {
-  max-width:100%;
+  max-width: 100%;
   height:auto;
 }
+
+img#add_post {
+  max-width: 4%;
+}
+
+a#add_post { margin-left: 11em; }
 
 hr {
   border: 0;
