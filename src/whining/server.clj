@@ -10,7 +10,8 @@
     [ring.middleware.params]
     [compojure.core :as compojure]
     [clojure.java.shell :as shell]
-    [ring.middleware.multipart-params])
+    [ring.middleware.multipart-params]
+    [ring.middleware.cookies :as cookies])
   (:import
     [java.util UUID]
     [org.joda.time DateTime]
@@ -289,7 +290,7 @@
     { :body (render-html (forbidden-page (get (:params req) "redirect"))) })
 
   
-  (compojure/GET "/authenticate" [req] ;; ?user=...&token=..&redirect=...
+  (compojure/GET "/authenticate" [:as req] ;; ?user=...&token=..&redirect=...
     (let [user  (get (:params req) "user")
           token (get (:params req) "token")
           redirect (get (:params req) "redirect")]
@@ -329,6 +330,7 @@
 (def app 
   (-> routes
     (read-session)
+    (cookies/wrap-cookies)
     (ring.middleware.params/wrap-params)
     (with-headers { "Cache-Control" "no-cache"
                     "Expires"       "-1" 
