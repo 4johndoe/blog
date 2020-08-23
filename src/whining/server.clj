@@ -231,13 +231,26 @@
               :name "body"
               :placeholder "Пиши сюда ..."}]]
         [:.edit_post_submit
-          [:button (if create? "Создать" "Сохранить")]]])))
+          [:button.btn (if create? "Создать" "Сохранить")]]])))
+
+
+(rum/defc send-email-page [email redirect]
+  (page {}
+    [:a { :href (str "/authenticate?user=") } "Войти"]))
 
 
 (rum/defc forbidden-page [redirect]
   (page {}
-    [:a { :href (str "/authenticate?user=nikitonsky&token=ABC&redirect=" (encode-uri-component redirect)) }
-        "Login"]))
+    [:form {  :action "/send-email"
+              :method "post"}
+      [:div.forbidden_email
+        [:input { :type "text" :name "email" :placeholder "E-mail" :value "helpdesk@gerchikco.com" }]] 
+      [:div
+        [:input { :type "text" :name "redirect" :value redirect }]]  ;; FIXME
+      [:div
+        [:button.btn "Отправить письмецо"]]]))
+    ; [:a { :href (str "/authenticate?user=nikitonsky&token=ABC&redirect=" (encode-uri-component redirect)) }
+    ;     "Login"]))
 
 
 (defn post-ids [] 
@@ -337,6 +350,10 @@
     { :status 302
           :headers { "Location" "/" }
           :session nil } )
+
+  (compojure/POST "/send-email" [:as req]
+    (let [params (:params req)]
+      { :body (render-html (send-email-page (:email params) (:redirect params))) }))
 
   protected-routes
 
