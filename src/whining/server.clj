@@ -183,13 +183,16 @@
   (str
     (encode (quot (System/currentTimeMillis) 1000) 6)
     (encode (rand-int (* 64 64 64)) 3)))
-  ; (let [uuid      (UUID/randomUUID)
-  ;       time      (int (/ (System/currentTimeMillis) 1000))
-  ;       high      (.getMostSignificantBits uuid)
-  ;       low       (.getLeastSignificantBits uuid)
-  ;       new-high  (bit-or (bit-and high 0x00000000FFFFFFFF)
-  ;                         (bit-shift-left time 32)) ]
-  ;   (str (UUID. new-high low))))
+
+
+(defn gen-token []
+  (str
+    (encode (rand-int (Integer/MAX_VALUE)) 5)
+    (encode (rand-int (Integer/MAX_VALUE)) 5)))
+
+
+(defn check-token [email token]
+  (= token (:value (get @*tokens email))))
 
 
 (defn save-post! [post pictures]
@@ -341,10 +344,13 @@
           user      (get authors email)
           token     (get (:params req) "token")
           redirect  (get (:params req) "redirect")]
-      { :status 302
-        :headers { "Location" redirect }
-        :session {  :user     user
-                    :created  (now) }}))
+      (if (check-token email token)
+        { :status 302
+          :headers { "Location" redirect }
+          :session {  :user     user
+                      :created  (now) }}
+        { :status 403
+          :body "403 Bad token" })))
 
 
   (compojure/GET "/logout" [:as req]
@@ -356,9 +362,12 @@
     (let [params    (:params req)
           email     (get params "email")
           redirect  (get params "redirect")
+          token     (gen-token)
           link      (str  "/authenticate" 
                           "?email=" (encode-uri-component email) 
+                          "&token=" (encode-uri-component token)
                           "&redirect=" (encode-uri-component redirect))]
+      (swap! *tokens assoc email { :value token :created (now) })
       { :body (render-html (send-email-page link)) }))
 
   protected-routes
