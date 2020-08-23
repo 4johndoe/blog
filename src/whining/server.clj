@@ -137,7 +137,7 @@
         [:header
           (if index?
             [:h1 title 
-              [:a#add_post { :href "/write" }
+              [:a#add_post { :href "/new" }
                 [:img#add_post { :src "/i/addNewPost.png" }] ]]
             [:h1 [:a {:href "/"} title]])
           [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
@@ -259,8 +259,8 @@
 ; "/post/:id"
 ; "/post/:id/pict.jpg"
 ; "/login"
-; GET "/write"
-; POST "/write"
+; GET "/new"
+; POST "/new"
 
 
 ; (defn read-session [handler]
@@ -279,7 +279,7 @@
 
 
 (compojure/defroutes protected-routes
-  (compojure/GET "/write" [:as req]
+  (compojure/GET "/new" [:as req]
     (or
       (check-session req)
       { :status 303
@@ -332,6 +332,12 @@
         :session {  :user     user
                     :created  (now) }}))
 
+
+  (compojure/GET "/logout" [:as req]
+    { :status 302
+          :headers { "Location" "/" }
+          :session nil } )
+
   protected-routes
 
   (fn [req]
@@ -360,10 +366,6 @@
 (def app 
   (-> 
     routes
-    ; ((fn [handler]
-    ;   (fn [req]
-    ;     (prn (:session req))
-    ;     (handler req))))
     (session/wrap-session
       { :store (session.cookie/cookie-store { :key cookie-secret })
         :cookie-name "grumpy"
