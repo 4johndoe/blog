@@ -30,6 +30,7 @@
 
 
 (def date-formatter (DateTimeFormat/forPattern "dd.MM.YYYY"))
+(def authors { "helpdesk@gerchikco.com" "nikitonsky"})
 
 
 (defn zip [coll1 coll2]
@@ -234,9 +235,9 @@
           [:button.btn (if create? "Создать" "Сохранить")]]])))
 
 
-(rum/defc send-email-page [email redirect]
+(rum/defc send-email-page [link]
   (page {}
-    [:a { :href (str "/authenticate?user=") } "Войти"]))
+    [:a { :href link } link]))
 
 
 (rum/defc forbidden-page [redirect]
@@ -336,10 +337,11 @@
     { :body (render-html (forbidden-page (get (:params req) "redirect"))) })
 
   
-  (compojure/GET "/authenticate" [:as req] ;; ?user=...&token=..&redirect=...
-    (let [user  (get (:params req) "user")
-          token (get (:params req) "token")
-          redirect (get (:params req) "redirect")]
+  (compojure/GET "/authenticate" [:as req] ;; ?email=...&token=..&redirect=...
+    (let [email     (get (:params req) "email")
+          user      (get authors email)
+          token     (get (:params req) "token")
+          redirect  (get (:params req) "redirect")]
       { :status 302
         :headers { "Location" redirect }
         :session {  :user     user
@@ -352,8 +354,13 @@
           :session nil } )
 
   (compojure/POST "/send-email" [:as req]
-    (let [params (:params req)]
-      { :body (render-html (send-email-page (:email params) (:redirect params))) }))
+    (let [params    (:params req)
+          email     (get params "email")
+          redirect  (get params "redirect")
+          link      (str  "/authenticate" 
+                          "?email=" (encode-uri-component email) 
+                          "&redirect=" (encode-uri-component redirect))]
+      { :body (render-html (send-email-page link)) }))
 
   protected-routes
 
