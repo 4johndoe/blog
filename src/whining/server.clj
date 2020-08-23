@@ -360,10 +360,10 @@
 (def app 
   (-> 
     routes
-    ((fn [handler]
-      (fn [req]
-        (prn (:session req))
-        (handler req))))
+    ; ((fn [handler]
+    ;   (fn [req]
+    ;     (prn (:session req))
+    ;     (handler req))))
     (session/wrap-session
       { :store (session.cookie/cookie-store { :key cookie-secret })
         :cookie-name "grumpy"
