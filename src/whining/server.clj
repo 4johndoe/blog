@@ -11,7 +11,8 @@
     [compojure.core :as compojure]
     [clojure.java.shell :as shell]
     [ring.middleware.multipart-params]
-    [ring.middleware.cookies :as cookies])
+    [ring.middleware.session :as session]
+    [ring.middleware.session.cookie :as session.cookie])
   (:import
     [java.util UUID]
     [org.joda.time DateTime]
@@ -35,6 +36,10 @@
   (map vector coll1 coll2))
 
 
+(defn now []
+  (java.util.Date.))
+
+
 (defn render-date [inst]
   (.print date-formatter (DateTime. inst)))
 
@@ -48,6 +53,33 @@
       (str/replace #"\%28"  "(")
       (str/replace #"\%29"  ")")
       (str/replace #"\%7E"  "-")))
+
+
+(defn random-bytes [size]
+  (let [seed (byte-array size)]
+    (.nextBytes (java.security.SecureRandom.) seed)
+    seed))
+
+
+(defn save-bytes! [file bytes]
+  (with-open [os (io/output-stream (io/file file))]
+    (.write os bytes)))
+
+
+(defn read-bytes [file len]
+  (vec (with-open [is (io/input-stream (io/file file))]
+    ; (prn is (.available is))
+    (let [res (make-array Byte/TYPE len)]
+      (.read is res 0 16)
+      res))))
+
+
+(def cookie-secret
+  (if (.exists (io/file "COOKIE_SECRET"))
+    (read-bytes "COOKIE_SECRET" 16)
+    (let [bytes (random-bytes 16)]
+      (save-bytes! "COOKIE_SECRET" bytes)
+      bytes)))
 
 
 (defn send-mail! [{:keys [to subject body]}]
@@ -231,17 +263,17 @@
 ; POST "/write"
 
 
-(defn read-session [handler]
-  (fn [req]
-    (let [session (some-> (get-in req [:cookies "session" :value])
-                              (edn/read-string))]
-      (handler (if (some? session)
-                    (assoc req :user (:user session))
-                    req)))))
+; (defn read-session [handler]
+;   (fn [req]
+;     (let [session (some-> (get-in req [:cookies "session" :value])
+;                               (edn/read-string))]
+;       (handler (if (some? session)
+;                     (assoc req :user (:user session))
+;                     req)))))
 
 
 (defn check-session [req]
-  (when (nil? (:user req))
+  (when (nil? (get-in req [:session :user]))
     { :status 302
       :headers {  "Location" (str "/forbidden?redirect=" (encode-uri-component (:uri req)))  }} ))
 
@@ -267,8 +299,8 @@
                 picture (get params "picture")]
               (save-post! { :id id
                             :body body
-                            :author (:user req)
-                            :created (java.util.Date.) }
+                            :author (get-in req [:session :user])
+                            :created (now) }
                           [picture])
               { :status 303
               :headers { "Location" (str "/post/" id) }})))))
@@ -297,11 +329,8 @@
           redirect (get (:params req) "redirect")]
       { :status 302
         :headers { "Location" redirect }
-        :cookies { "session" {  :value (pr-str { :user user })
-                                :http-only true
-                                :secure false ;; FIXME
-                                ; :max-age    ;; FIXME 
-                              }}}))
+        :session {  :user     user
+                    :created  (now) }}))
 
   protected-routes
 
@@ -329,9 +358,19 @@
 
 
 (def app 
-  (-> routes
-    (read-session)
-    (cookies/wrap-cookies)
+  (-> 
+    routes
+    ((fn [handler]
+      (fn [req]
+        (prn (:session req))
+        (handler req))))
+    (session/wrap-session
+      { :store (session.cookie/cookie-store { :key cookie-secret })
+        :cookie-name "grumpy"
+        :cookie-attrs { :http-only  true
+                        :secure     false ;; FIXME
+                        ; :max-age    ;; FIXME
+                      } })
     (ring.middleware.params/wrap-params)
     (with-headers { "Cache-Control" "no-cache"
                     "Expires"       "-1" 
