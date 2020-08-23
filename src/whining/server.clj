@@ -27,11 +27,10 @@
 
 (def styles (slurp (io/resource "style.css")))
 (def script (slurp (io/resource "script.js")))
-
-
 (def date-formatter (DateTimeFormat/forPattern "dd.MM.YYYY"))
 (def authors { "helpdesk@gerchikco.com" "nikitonsky"})
 
+(defonce *tokens (atom {}))
 
 (defn zip [coll1 coll2]
   (map vector coll1 coll2))
