@@ -1,4 +1,4 @@
-(ns whining.server
+(ns grumpy.server
   (:require
     [compojure.route]
     [rum.core :as rum]
@@ -14,9 +14,9 @@
     [ring.middleware.session :as session]
     [ring.middleware.session.cookie :as session.cookie])
   (:import
-    [java.util UUID]
+    [java.util UUID Date]
     [org.joda.time DateTime]
-    [org.joda.time.format DateTimeFormat])
+    [org.joda.time.format DateTimeFormat DateTimeFormatter])
   (:gen-class))
 
 
@@ -30,19 +30,21 @@
 (def date-formatter (DateTimeFormat/forPattern "dd.MM.YYYY"))
 (def authors {  "helpdesk@gerchikco.com" "John"
                 "bogdandemchenko@gmail.com" "Sam" })
-
 (defonce *tokens (atom {}))
+(def session-ttl (* 1000 86400 14)) ;; 14 days
+(def token-ttl-ms (* 1000 60 15)) ;; 15 min
+
 
 (defn zip [coll1 coll2]
   (map vector coll1 coll2))
 
 
-(defn now []
-  (java.util.Date.))
+(defn now ^Date []
+  (Date.))
 
 
 (defn render-date [inst]
-  (.print date-formatter (DateTime. inst)))
+  (.print ^DateTimeFormatter date-formatter (DateTime. inst)))
 
 
 (defn encode-uri-component [s]
@@ -75,7 +77,7 @@
     seed))
 
 
-(defn save-bytes! [file bytes]
+(defn save-bytes! [file ^bytes bytes]
   (with-open [os (io/output-stream (io/file file))]
     (.write os bytes)))
 
@@ -87,8 +89,12 @@
       (.read is res 0 16)
       res))))
 
+;; CLEAR COOKIE_SECRET
+(if (.exists (io/file "COOKIE_SECRET"))
+    (io/delete-file "COOKIE_SECRET"))
 
-(defonce cookie-secret
+
+(def cookie-secret
   (if (.exists (io/file "COOKIE_SECRET"))
     (read-bytes "COOKIE_SECRET" 16)
     (let [bytes (random-bytes 16)]
@@ -207,12 +213,13 @@
     (encode (rand-int (Integer/MAX_VALUE)) 5)))
 
 
-(def token-ttl-ms (* 1000 60 15)) ;; 15 min
+(defn since [^Date inst]
+  (- (.getTime (now)) (.getTime inst)))
 
 
 (defn get-token [email]
   (when-some [token (get @*tokens email)]
-  (let [created (.getTime (:created token))
+  (let [created (.getTime ^Date (:created token))
         age     (- (.getTime (now)) created)]
     (when (<= age token-ttl-ms)
       (:value token)))))
@@ -432,9 +439,19 @@
                   (clojure.stacktrace/print-stack-trace (clojure.stacktrace/root-cause e))) }))))
 
 
+(defn expire-session [handler]
+  (fn [req]
+    (let [created (:created (:session req))]
+      (if (and (some? created)
+              (> (since created) session-ttl))
+        (handler (dissoc req :session))
+        (handler req)))))
+
+
 (def app 
   (-> 
     routes
+    (expire-session)
     (session/wrap-session
       { :store (session.cookie/cookie-store { :key cookie-secret })
         :cookie-name "grumpy"
@@ -462,6 +479,4 @@
   (def server (-main "--port" "7070"))
   (web/stop server)
   (reset! *tokens {})
-  ; (if (.exists (io/file "COOKIE_SECRET"))
-  ;   (io/delete-file "COOKIE_SECRET"))
 ) 
