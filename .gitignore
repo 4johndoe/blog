@@ -11,5 +11,4 @@ pom.xml.asc
 /.prepl-port
 .hgignore
 .hg/
-posts/
-COOKIE_SECRET
+grumpy_data/

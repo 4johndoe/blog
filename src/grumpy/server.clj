@@ -34,6 +34,8 @@
 (def session-ttl (* 1000 86400 14)) ;; 14 days
 (def token-ttl-ms (* 1000 60 15)) ;; 15 min
 
+(.mkdirs (io/file "grumpy_data"))
+
 
 (defn zip [coll1 coll2]
   (map vector coll1 coll2))
@@ -90,15 +92,15 @@
       res))))
 
 ;; CLEAR COOKIE_SECRET
-(if (.exists (io/file "COOKIE_SECRET"))
-    (io/delete-file "COOKIE_SECRET"))
+(if (.exists (io/file "grumpy_data/COOKIE_SECRET"))
+    (io/delete-file "grumpy_data/COOKIE_SECRET"))
 
 
 (def cookie-secret
-  (if (.exists (io/file "COOKIE_SECRET"))
-    (read-bytes "COOKIE_SECRET" 16)
+  (if (.exists (io/file "grumpy_data/COOKIE_SECRET"))
+    (read-bytes "grumpy_data/COOKIE_SECRET" 16)
     (let [bytes (random-bytes 16)]
-      (save-bytes! "COOKIE_SECRET" bytes)
+      (save-bytes! "grumpy_data/COOKIE_SECRET" bytes)
       bytes)))
 
 
@@ -180,7 +182,7 @@
 
 
 (defn get-post [post_id]
-  (let [path (str "posts/" post_id "/post.edn")]
+  (let [path (str "grumpy_data/posts/" post_id "/post.edn")]
     (some-> (io/file path)
         (safe-slurp)
         (edn/read-string))))
@@ -226,7 +228,7 @@
 
 
 (defn save-post! [post pictures]
-  (let [dir           (io/file (str "posts/" (:id post)))
+  (let [dir           (io/file (str "grumpy_data/posts/" (:id post)))
         picture-names (for [[picture idx] (zip pictures (range))
                             :let [in-name   (:filename picture)
                                   [_ ext]   (re-matches #".*(\.[^\.]+)" in-name)]]
@@ -288,8 +290,8 @@
 
 (defn post-ids [] 
   (->>
-    (for [name (seq (.list (io/file "posts")))
-          :let [child (io/file "posts" name)]
+    (for [name (seq (.list (io/file "grumpy_data/posts")))
+          :let [child (io/file "grumpy_data/posts" name)]
           :when (.isDirectory child)]
         name)
     (sort)
@@ -357,7 +359,7 @@
     { :body (render-html (index-page (post-ids))) })
 
   (compojure/GET "/post/:id/:img" [id img]
-    (ring.util.response/file-response (str "posts/" id "/" img)))
+    (ring.util.response/file-response (str "grumpy_data/posts/" id "/" img)))
 
   (compojure/GET "/post/:id" [id]
     { :body (render-html (post-page id)) })
@@ -453,8 +455,8 @@
     routes
     (expire-session)
     (session/wrap-session
-      { :store (session.cookie/cookie-store { :key cookie-secret })
-        :cookie-name "grumpy"
+      { :store        (session.cookie/cookie-store { :key cookie-secret })
+        :cookie-name  "grumpy"
         :cookie-attrs { :http-only  true
                         :secure     false ;; FIXME
                         ; :max-age    ;; FIXME
