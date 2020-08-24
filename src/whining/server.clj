@@ -139,7 +139,9 @@
             [:h1 title 
               [:a#add_post { :href "/new" }
                 [:img#add_post { :src "/i/addNewPost.png" }] ]]
-            [:h1 [:a {:href "/"} title]])
+            [:h1 [:a {:href "/"} title]
+              [:a#add_post { :href "/logout" }
+                [:img#add_post { :src "/i/logout.png" }]]])
           [:p#site_subtitle "Это текст, это ссылка. Не нажимайте на ссылку."]]
         children ]
       [:footer
