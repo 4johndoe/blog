@@ -104,7 +104,7 @@
       bytes)))
 
 
-(defn send-mail! [{:keys [to subject body]}]
+(defn send-email! [{:keys [to subject body]}]
   (shell/sh
     "mail"
     "-s"
@@ -113,20 +113,6 @@
     "-a" "Content-Type: text/html"
     "-a" "From:Grumpy Admin <admin@grumpy.website>"
     :in body))
-
-(send-mail! { :to "bogdandemchenko@gmail.com"
-              :subject (str "Login to Grumpy " (rand))
-              :body "<html>
-                      <div style='text-align: center;'>
-                        <a href='#' 
-                           style='display: inline-block; 
-                                  font-size: 16px; 
-                                  padding: 0.5em 1.75em; 
-                                  background: #c3c; 
-                                  color: white; 
-                                  text-decoration: none; 
-                                  border-radius: 4px;'>
-                          Login:</a></div></html>" })
 
 
 (rum/defc post [post]
@@ -279,9 +265,9 @@
     [:form {  :action "/send-email"
               :method "post"}
       [:div.forbidden_email
-        [:input { :type "text" :name "email" :placeholder "E-mail" :value "helpdesk@gerchikco.com" }]] 
+        [:input { :type "text" :name "email" :placeholder "E-mail" :autofocus true :value "helpdesk@gerchikco.com" }]] 
       [:div
-        [:input { :type "text" :name "redirect-url" :value redirect-url }]]  ;; FIXME
+        [:input { :type "hidden" :name "redirect-url" :value redirect-url }]]  ;; FIXME
       [:div
         [:button.btn "Отправить письмецо"]]]))
     ; [:a { :href (str "/authenticate?user=nikitonsky&token=ABC&redirect=" (encode-uri-component redirect)) }
@@ -396,7 +382,7 @@
         (not (contains? authors email))
           (redirect "/email-sent" { :message (str "You are not an author, " email) })
         (some? (get-token email))
-          (redirect "/email-sent" { :message "Token still alive, check your email."})
+          (redirect "/email-sent" { :message (str "Token still alive, check your email, " email)})
         :else
           (let [token         (gen-token)
                 redirect-url  (get params "redirect-url")
@@ -410,7 +396,23 @@
                                     "&token=" (encode-uri-component token)
                                     "&redirect-url=" (encode-uri-component redirect-url))]
             (swap! *tokens assoc email { :value token :created (now) })
-            (redirect "/email-sent" { :message link }))))) ;; FIXME
+            (send-email! 
+              { :to       email
+                :subject  (str "Login to Grumpy " (render-date (now)))
+                :body     (str "<html>
+                            <div style='text-align: center;'>
+                              <a href='" link "' 
+                                style='display: inline-block; 
+                                        font-size: 16px; 
+                                        padding: 0.5em 1.75em; 
+                                        background: #c3c; 
+                                        color: white; 
+                                        text-decoration: none; 
+                                        border-radius: 4px;'>
+                                Login:</a></div></html>") })
+            (redirect "/email-sent" { :message (str "Check your mail, " email
+                                      " link: " link) ;; DROP
+            })))))
 
 
   (compojure/GET "/email-sent" [:as req]
