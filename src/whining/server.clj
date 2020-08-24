@@ -74,7 +74,7 @@
       res))))
 
 
-(def cookie-secret
+(defonce cookie-secret
   (if (.exists (io/file "COOKIE_SECRET"))
     (read-bytes "COOKIE_SECRET" 16)
     (let [bytes (random-bytes 16)]
@@ -426,4 +426,6 @@
 (comment 
   (def server (-main "--port" "7070"))
   (web/stop server)
+  ; (if (.exists (io/file "COOKIE_SECRET"))
+  ;   (io/delete-file "COOKIE_SECRET"))
 )
