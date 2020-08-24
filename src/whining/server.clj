@@ -206,8 +206,15 @@
     (encode (rand-int (Integer/MAX_VALUE)) 5)))
 
 
+(def token-ttl-ms (* 1000 60 15)) ;; 15 min
+
+
 (defn get-token [email]
-  (:value (get @*tokens email))) ;; FIXME validate ts
+  (when-some [token (get @*tokens email)]
+  (let [created (.getTime (:created token))
+        age     (- (.getTime (now)) created)]
+    (when (<= age token-ttl-ms)
+      (:value token)))))
 
 
 (defn save-post! [post pictures]
