@@ -28,7 +28,8 @@
 (def styles (slurp (io/resource "style.css")))
 (def script (slurp (io/resource "script.js")))
 (def date-formatter (DateTimeFormat/forPattern "dd.MM.YYYY"))
-(def authors { "helpdesk@gerchikco.com" "nikitonsky"})
+(def authors {  "helpdesk@gerchikco.com" "John"
+                "bogdandemchenko@gmail.com" "Sam" })
 
 (defonce *tokens (atom {}))
 
@@ -382,21 +383,25 @@
   (compojure/POST "/send-email" [:as req]
     (let [params    (:params req)
           email     (get params "email")]
-      (if (some? (get-token email))
-        (redirect "/email-sent" { :message "Token still alive, check your email."})
-        (let [token         (gen-token)
-              redirect-url  (get params "redirect-url")
-              link          (str  (name (:scheme req))
-                                  "://"
-                                  (:server-name req)
-                                  (when (not= (:server-port req) 80)
-                                    (str ":" (:server-port req)))
-                                  "/authenticate" 
-                                  "?email=" (encode-uri-component email) 
-                                  "&token=" (encode-uri-component token)
-                                  "&redirect-url=" (encode-uri-component redirect-url))]
-          (swap! *tokens assoc email { :value token :created (now) })
-          (redirect "/email-sent" { :message link }))))) ;; FIXME
+      (cond 
+        (not (contains? authors email))
+          (redirect "/email-sent" { :message (str "You are not an author, " email) })
+        (some? (get-token email))
+          (redirect "/email-sent" { :message "Token still alive, check your email."})
+        :else
+          (let [token         (gen-token)
+                redirect-url  (get params "redirect-url")
+                link          (str  (name (:scheme req))
+                                    "://"
+                                    (:server-name req)
+                                    (when (not= (:server-port req) 80)
+                                      (str ":" (:server-port req)))
+                                    "/authenticate" 
+                                    "?email=" (encode-uri-component email) 
+                                    "&token=" (encode-uri-component token)
+                                    "&redirect-url=" (encode-uri-component redirect-url))]
+            (swap! *tokens assoc email { :value token :created (now) })
+            (redirect "/email-sent" { :message link }))))) ;; FIXME
 
 
   (compojure/GET "/email-sent" [:as req]
