@@ -106,3 +106,4 @@ form > div {
 
 .edit_post_submit > button:hover { background: #d4d; }
 .edit_post_submit > button:active { background: #c3c; }
+.email_sent_message { font-size: 200%; line-height: 1.4em; }

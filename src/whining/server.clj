@@ -55,6 +55,18 @@
       (str/replace #"\%7E"  "-")))
 
 
+(defn redirect [url query]
+  (let [query-str (when-not (empty? query)
+                    (map 
+                      (fn [[k v]]
+                        (str (name k) "=" (encode-uri-component v)))
+                      query))]
+  { :status 302
+    :headers { "Location" (if (some? query-str) 
+                            (str url "?" query-str) 
+                            url) }}))
+
+
 (defn random-bytes [size]
   (let [seed (byte-array size)]
     (.nextBytes (java.security.SecureRandom.) seed)
@@ -193,8 +205,8 @@
     (encode (rand-int (Integer/MAX_VALUE)) 5)))
 
 
-(defn check-token [email token]
-  (= token (:value (get @*tokens email))))
+(defn get-token [email]
+  (:value (get @*tokens email))) ;; FIXME validate ts
 
 
 (defn save-post! [post pictures]
@@ -239,9 +251,9 @@
           [:button.btn (if create? "Создать" "Сохранить")]]])))
 
 
-(rum/defc send-email-page [link]
+(rum/defc email-sent-page [message]
   (page {}
-    [:a { :href link } link]))
+    [:div.email_sent_message message]))
 
 
 (rum/defc forbidden-page [redirect]
@@ -346,7 +358,7 @@
           user      (get authors email)
           token     (get (:params req) "token")
           redirect  (get (:params req) "redirect")]
-      (if (check-token email token)
+      (if (= token (get-token email))
         { :status 302
           :headers { "Location" redirect }
           :session {  :user     user
@@ -365,12 +377,21 @@
           email     (get params "email")
           redirect  (get params "redirect")
           token     (gen-token)
-          link      (str  "/authenticate" 
+          link      (str  (name (:scheme req))  
+                          "://"
+                          (:server-name req)
+                          (when (not= (:server-port req) 80)
+                            (str ":" (:server-port req)))
+                          "/authenticate" 
                           "?email=" (encode-uri-component email) 
                           "&token=" (encode-uri-component token)
                           "&redirect=" (encode-uri-component redirect))]
       (swap! *tokens assoc email { :value token :created (now) })
-      { :body (render-html (send-email-page link)) }))
+      { :status 302
+        :headers {  "Location" (str "/email-sent?message=" (encode-uri-component link)) } }))
+
+  (compojure/GET "/email-sent" [:as req]
+    { :body (render-html (email-sent-page (get-in req [:params "message"]))) })
 
   protected-routes
 
