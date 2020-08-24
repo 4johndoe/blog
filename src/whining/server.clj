@@ -55,16 +55,17 @@
       (str/replace #"\%7E"  "-")))
 
 
-(defn redirect [url query]
-  (let [query-str (when-not (empty? query)
-                    (map 
+(defn redirect 
+  ([url] 
+    { :status 302
+      :headers { "Location" url }})
+  ([url query]
+    (let [query-str (map 
                       (fn [[k v]]
                         (str (name k) "=" (encode-uri-component v)))
-                      query))]
-  { :status 302
-    :headers { "Location" (if (some? query-str) 
-                            (str url "?" query-str) 
-                            url) }}))
+                      query)]
+      { :status 302
+        :headers { "Location" (str url "?" (str/join "&" query-str)) }})))
 
 
 (defn random-bytes [size]
@@ -256,14 +257,14 @@
     [:div.email_sent_message message]))
 
 
-(rum/defc forbidden-page [redirect]
+(rum/defc forbidden-page [redirect-url]
   (page {}
     [:form {  :action "/send-email"
               :method "post"}
       [:div.forbidden_email
         [:input { :type "text" :name "email" :placeholder "E-mail" :value "helpdesk@gerchikco.com" }]] 
       [:div
-        [:input { :type "text" :name "redirect" :value redirect }]]  ;; FIXME
+        [:input { :type "text" :name "redirect-url" :value redirect-url }]]  ;; FIXME
       [:div
         [:button.btn "Отправить письмецо"]]]))
     ; [:a { :href (str "/authenticate?user=nikitonsky&token=ABC&redirect=" (encode-uri-component redirect)) }
@@ -304,8 +305,7 @@
 
 (defn check-session [req]
   (when (nil? (get-in req [:session :user]))
-    { :status 302
-      :headers {  "Location" (str "/forbidden?redirect=" (encode-uri-component (:uri req)))  }} ))
+    (redirect "/forbidden" {  :redirect-url (:uri req) })))
 
 
 (compojure/defroutes protected-routes
@@ -332,8 +332,7 @@
                             :author (get-in req [:session :user])
                             :created (now) }
                           [picture])
-              { :status 303
-              :headers { "Location" (str "/post/" id) }})))))
+              (redirect (str "/post/" id)))))))
 
 
 (compojure/defroutes routes
@@ -350,45 +349,48 @@
 
 
   (compojure/GET "/forbidden" [:as req]
-    { :body (render-html (forbidden-page (get (:params req) "redirect"))) })
+    { :body (render-html (forbidden-page (get (:params req) "redirect-url"))) })
 
   
-  (compojure/GET "/authenticate" [:as req] ;; ?email=...&token=..&redirect=...
+  (compojure/GET "/authenticate" [:as req] ;; ?email=...&token=..&redirect-url=...
     (let [email     (get (:params req) "email")
           user      (get authors email)
           token     (get (:params req) "token")
-          redirect  (get (:params req) "redirect")]
+          redirect-url  (get (:params req) "redirect-url")]
       (if (= token (get-token email))
-        { :status 302
-          :headers { "Location" redirect }
+        (assoc 
+          (redirect redirect-url)
           :session {  :user     user
-                      :created  (now) }}
-        { :status 403
-          :body "403 Bad token" })))
+                      :created  (now) })
+          { :status 403
+            :body "403 Bad token" })))
 
 
   (compojure/GET "/logout" [:as req]
-    { :status 302
-          :headers { "Location" "/" }
-          :session nil } )
+    (assoc 
+      (redirect "/")
+      :session nil ))
+          
 
   (compojure/POST "/send-email" [:as req]
     (let [params    (:params req)
-          email     (get params "email")
-          redirect  (get params "redirect")
-          token     (gen-token)
-          link      (str  (name (:scheme req))  
-                          "://"
-                          (:server-name req)
-                          (when (not= (:server-port req) 80)
-                            (str ":" (:server-port req)))
-                          "/authenticate" 
-                          "?email=" (encode-uri-component email) 
-                          "&token=" (encode-uri-component token)
-                          "&redirect=" (encode-uri-component redirect))]
-      (swap! *tokens assoc email { :value token :created (now) })
-      { :status 302
-        :headers {  "Location" (str "/email-sent?message=" (encode-uri-component link)) } }))
+          email     (get params "email")]
+      (if (some? (get-token email))
+        (redirect "/email-sent" { :message "Token still alive, check your email."})
+        (let [token         (gen-token)
+              redirect-url  (get params "redirect-url")
+              link          (str  (name (:scheme req))
+                                  "://"
+                                  (:server-name req)
+                                  (when (not= (:server-port req) 80)
+                                    (str ":" (:server-port req)))
+                                  "/authenticate" 
+                                  "?email=" (encode-uri-component email) 
+                                  "&token=" (encode-uri-component token)
+                                  "&redirect-url=" (encode-uri-component redirect-url))]
+          (swap! *tokens assoc email { :value token :created (now) })
+          (redirect "/email-sent" { :message link }))))) ;; FIXME
+
 
   (compojure/GET "/email-sent" [:as req]
     { :body (render-html (email-sent-page (get-in req [:params "message"]))) })
@@ -447,6 +449,7 @@
 (comment 
   (def server (-main "--port" "7070"))
   (web/stop server)
+  (reset! *tokens {})
   ; (if (.exists (io/file "COOKIE_SECRET"))
   ;   (io/delete-file "COOKIE_SECRET"))
-)
+) 
