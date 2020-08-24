@@ -361,12 +361,14 @@
           token     (get (:params req) "token")
           redirect-url  (get (:params req) "redirect-url")]
       (if (= token (get-token email))
-        (assoc 
-          (redirect redirect-url)
-          :session {  :user     user
-                      :created  (now) })
-          { :status 403
-            :body "403 Bad token" })))
+        (do
+          (swap! *tokens dissoc email)
+          (assoc 
+            (redirect redirect-url)
+            :session {  :user     user
+                        :created  (now) })
+            { :status 403
+              :body "403 Bad token" }))))
 
 
   (compojure/GET "/logout" [:as req]
